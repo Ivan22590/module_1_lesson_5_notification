@@ -20,14 +20,22 @@ class ReminderDatabase:
                 description TEXT,
                 reminder_datetime TEXT NOT NULL,
                 status TEXT DEFAULT 'Ожидает',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                repeat_pattern TEXT DEFAULT NULL
             )
         ''')
+        
+        # Проверка наличия столбца repeat_pattern и его добавление при необходимости
+        try:
+            cursor.execute('SELECT repeat_pattern FROM reminders LIMIT 1')
+        except sqlite3.OperationalError:
+            # Столбец отсутствует, добавляем его
+            cursor.execute('ALTER TABLE reminders ADD COLUMN repeat_pattern TEXT DEFAULT NULL')
         
         conn.commit()
         conn.close()
     
-    def add_reminder(self, title: str, description: str, reminder_datetime: str) -> int:
+    def add_reminder(self, title: str, description: str, reminder_datetime: str, repeat_pattern: str = None) -> int:
         """Добавление нового напоминания"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -36,9 +44,9 @@ class ReminderDatabase:
         local_created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         cursor.execute('''
-            INSERT INTO reminders (title, description, reminder_datetime, status, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (title, description, reminder_datetime, 'Ожидает', local_created_at))
+            INSERT INTO reminders (title, description, reminder_datetime, status, created_at, repeat_pattern)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (title, description, reminder_datetime, 'Ожидает', local_created_at, repeat_pattern))
         
         reminder_id = cursor.lastrowid
         conn.commit()
@@ -125,3 +133,26 @@ class ReminderDatabase:
         conn.commit()
         conn.close()
         return updated_count
+    
+    def get_reminders_with_repeat(self) -> List[Tuple]:
+        """Получение напоминаний с повторением"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM reminders WHERE repeat_pattern IS NOT NULL AND repeat_pattern != "" ORDER BY reminder_datetime')
+        reminders = cursor.fetchall()
+        
+        conn.close()
+        return reminders
+    
+    def update_reminder_datetime(self, reminder_id: int, new_datetime: str) -> bool:
+        """Обновление даты и времени напоминания"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('UPDATE reminders SET reminder_datetime = ? WHERE id = ?', (new_datetime, reminder_id))
+        updated = cursor.rowcount > 0
+        
+        conn.commit()
+        conn.close()
+        return updated

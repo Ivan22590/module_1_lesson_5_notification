@@ -66,7 +66,12 @@ def check_and_show_notifications(database, interval=10):
                 overdue_reminders = database.get_overdue_reminders()
                 
                 for reminder in overdue_reminders:
-                    reminder_id, title, description, reminder_datetime, status, created_at = reminder
+                    # Обработка совместимости: проверяем количество значений в данных
+                    if len(reminder) >= 7:
+                        reminder_id, title, description, reminder_datetime, status, created_at, repeat_pattern = reminder
+                    else:
+                        reminder_id, title, description, reminder_datetime, status, created_at = reminder
+                        repeat_pattern = None
                     
                     # Обновляем статус просроченных напоминаний
                     database.update_reminder_status(reminder_id, 'Просрочено')
@@ -85,7 +90,12 @@ def check_and_show_notifications(database, interval=10):
                 current_time = datetime.now()
                 
                 for reminder in current_reminders:
-                    reminder_id, title, description, reminder_datetime, status, created_at = reminder
+                    # Обработка совместимости: проверяем количество значений в данных
+                    if len(reminder) >= 7:
+                        reminder_id, title, description, reminder_datetime, status, created_at, repeat_pattern = reminder
+                    else:
+                        reminder_id, title, description, reminder_datetime, status, created_at = reminder
+                        repeat_pattern = None
                     
                     # Проверяем формат даты и преобразуем в нужный формат
                     try:

@@ -49,9 +49,17 @@ class ReminderApp:
         self.datetime_entry.grid(row=2, column=1, padx=5, pady=2, sticky=tk.W)
         self.datetime_entry.insert(0, datetime.now().strftime('%Y-%m-%d %H:%M'))
         
+        # Повторение
+        ttk.Label(add_frame, text="Повторение:").grid(row=3, column=0, sticky=tk.W, padx=5, pady=2)
+        self.repeat_var = tk.StringVar(value="Нет")
+        repeat_options = ["Нет", "ежедневно", "еженедельно", "ежемесячно", "ежегодно", "каждые_30_минут", "каждые_1_час", "каждые_1_день"]
+        self.repeat_combo = ttk.Combobox(add_frame, textvariable=self.repeat_var, values=repeat_options, width=47)
+        self.repeat_combo.grid(row=3, column=1, padx=5, pady=2, sticky=tk.W)
+        self.repeat_combo.set("Нет")
+        
         # Кнопка добавления
         add_button = ttk.Button(add_frame, text="Добавить напоминание", command=self.add_reminder)
-        add_button.grid(row=3, column=1, padx=5, pady=5, sticky=tk.E)
+        add_button.grid(row=4, column=1, padx=5, pady=5, sticky=tk.E)
         
         # Фрейм для фильтрации
         filter_frame = ttk.LabelFrame(self.root, text="Фильтр по статусу", padding=10)
@@ -106,26 +114,37 @@ class ReminderApp:
     
     def add_reminder(self):
         """Добавление нового напоминания"""
-        title = self.title_entry.get().strip()
-        description = self.description_entry.get().strip()
-        datetime_str = self.datetime_entry.get().strip()
-        
-        if not title:
-            messagebox.showerror("Ошибка", "Введите заголовок напоминания")
-            return
-        
         try:
-            # Проверяем формат даты
-            datetime.strptime(datetime_str, '%Y-%m-%d %H:%M')
-        except ValueError:
-            messagebox.showerror("Ошибка", "Неверный формат даты. Используйте ГГГГ-ММ-ДД ЧЧ:ММ")
-            return
-        
-        try:
-            reminder_id = self.db.add_reminder(title, description, datetime_str)
-            messagebox.showinfo("Успех", f"Напоминание добавлено с ID: {reminder_id}")
+            title = self.title_entry.get().strip()
+            description = self.description_entry.get().strip()
+            reminder_datetime = self.datetime_entry.get().strip()
+            repeat_pattern = self.repeat_var.get() if self.repeat_var.get() != "Нет" else None
+            
+            if not title:
+                messagebox.showwarning("Предупреждение", "Пожалуйста, введите заголовок напоминания")
+                return
+                
+            # Проверка формата даты
+            try:
+                datetime.strptime(reminder_datetime, '%Y-%m-%d %H:%M')
+            except ValueError:
+                try:
+                    datetime.strptime(reminder_datetime, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    messagebox.showerror("Ошибка", "Неверный формат даты. Используйте ГГГГ-ММ-ДД ЧЧ:ММ или ГГГГ-ММ-ДД ЧЧ:ММ:СС")
+                    return
+            
+            # Добавление напоминания в базу данных
+            reminder_id = self.db.add_reminder(title, description, reminder_datetime, repeat_pattern)
+            
+            # Очистка полей ввода
             self.clear_entries()
+            
+            # Загрузка обновленного списка напоминаний
             self.load_reminders()
+            
+            messagebox.showinfo("Успех", "Напоминание успешно добавлено")
+            
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось добавить напоминание: {str(e)}")
     
@@ -143,7 +162,13 @@ class ReminderApp:
         
         # Заполнение таблицы
         for reminder in reminders:
-            reminder_id, title, description, reminder_datetime, status, created_at = reminder
+            # Поддержка совместимости: старые записи не содержат repeat_pattern
+            if len(reminder) >= 7:
+                reminder_id, title, description, reminder_datetime, status, created_at, repeat_pattern = reminder
+            else:
+                reminder_id, title, description, reminder_datetime, status, created_at = reminder
+                repeat_pattern = None
+            
             self.tree.insert("", tk.END, values=(
                 reminder_id, title, description, reminder_datetime, status, created_at
             ))
